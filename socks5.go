@@ -2,6 +2,7 @@ package socks5
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"log"
 	"net"

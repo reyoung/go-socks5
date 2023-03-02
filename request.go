@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"golang.org/x/net/context"
+	"context"
 )
 
 const (
@@ -119,20 +119,6 @@ func NewRequest(bufConn io.Reader) (*Request, error) {
 func (s *Server) handleRequest(req *Request, conn conn) error {
 	ctx := context.Background()
 
-	// Resolve the address if we have a FQDN
-	dest := req.DestAddr
-	if dest.FQDN != "" {
-		ctx_, addr, err := s.config.Resolver.Resolve(ctx, dest.FQDN)
-		if err != nil {
-			if err := sendReply(conn, hostUnreachable, nil); err != nil {
-				return fmt.Errorf("Failed to send reply: %v", err)
-			}
-			return fmt.Errorf("Failed to resolve destination '%v': %v", dest.FQDN, err)
-		}
-		ctx = ctx_
-		dest.IP = addr
-	}
-
 	// Apply any address rewrites
 	req.realDestAddr = req.DestAddr
 	if s.config.Rewriter != nil {
@@ -170,11 +156,11 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 	// Attempt to connect
 	dial := s.config.Dial
 	if dial == nil {
-		dial = func(ctx context.Context, net_, addr string) (net.Conn, error) {
-			return net.Dial(net_, addr)
+		dial = func(ctx context.Context, addr *AddrSpec) (net.Conn, error) {
+			return net.Dial("tcp", addr.Address())
 		}
 	}
-	target, err := dial(ctx, "tcp", req.realDestAddr.Address())
+	target, err := dial(ctx, req.DestAddr)
 	if err != nil {
 		msg := err.Error()
 		resp := hostUnreachable
